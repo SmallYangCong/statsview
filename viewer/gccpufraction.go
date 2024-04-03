@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
@@ -18,15 +19,17 @@ const (
 
 // GCCPUFractionViewer collects the GC-CPU fraction metric via `runtime.ReadMemStats()`
 type GCCPUFractionViewer struct {
-	smgr  *StatsMgr
-	graph *charts.Line
-	p     *process.Process
+	smgr   *StatsMgr
+	graph  *charts.Line
+	p      *process.Process
+	numCPU int
 }
 
 // NewGCCPUFractionViewer returns the GCCPUFractionViewer instance
 // Series: Fraction
 func NewGCCPUFractionViewer() Viewer {
 	p, _ := process.NewProcess(int32(os.Getpid()))
+	numCPU := runtime.NumCPU()
 
 	graph := NewBasicView(VGCCPUFraction)
 	graph.SetGlobalOptions(
@@ -35,8 +38,9 @@ func NewGCCPUFractionViewer() Viewer {
 	)
 	graph.AddSeries("GC CPUFraction", []opts.LineData{})
 	graph.AddSeries("App CPUFraction", []opts.LineData{})
+	graph.AddSeries("App OneCPUFraction", []opts.LineData{})
 
-	return &GCCPUFractionViewer{graph: graph, p: p}
+	return &GCCPUFractionViewer{graph: graph, p: p, numCPU: numCPU}
 }
 
 func (vr *GCCPUFractionViewer) SetStatsMgr(smgr *StatsMgr) {
@@ -58,6 +62,7 @@ func (vr *GCCPUFractionViewer) Serve(w http.ResponseWriter, _ *http.Request) {
 		Values: []float64{
 			FixedPrecision(memstats.Stats.GCCPUFraction, 6),
 			FixedPrecision(vr.getAppCPUFraction(), 6),
+			FixedPrecision(vr.getAppCPUFraction()/float64(vr.numCPU), 6),
 		},
 		Time: memstats.T,
 	}
