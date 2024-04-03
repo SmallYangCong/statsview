@@ -72,5 +72,5 @@ func (vr *GCCPUFractionViewer) getAppCPUFraction() float64 {
 		return 0.0
 	}
 	percent, _ := p.Percent(time.Second)
-	return percent
+	return percent / 100
 }
