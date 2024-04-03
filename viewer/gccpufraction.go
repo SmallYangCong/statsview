@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"runtime"
 	"time"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
@@ -28,8 +27,13 @@ type GCCPUFractionViewer struct {
 // NewGCCPUFractionViewer returns the GCCPUFractionViewer instance
 // Series: Fraction
 func NewGCCPUFractionViewer() Viewer {
+	return NewGCCPUFractionViewerWithNumCPU(-1)
+}
+
+// NewGCCPUFractionViewer returns the GCCPUFractionViewer instance
+// Series: Fraction
+func NewGCCPUFractionViewerWithNumCPU(numCPU int) Viewer {
 	p, _ := process.NewProcess(int32(os.Getpid()))
-	numCPU := runtime.NumCPU()
 
 	graph := NewBasicView(VGCCPUFraction)
 	graph.SetGlobalOptions(
@@ -38,7 +42,9 @@ func NewGCCPUFractionViewer() Viewer {
 	)
 	graph.AddSeries("GC CPUFraction", []opts.LineData{})
 	graph.AddSeries("App CPUFraction", []opts.LineData{})
-	graph.AddSeries("App OneCPUFraction", []opts.LineData{})
+	if numCPU > 0 {
+		graph.AddSeries("App OneCPUFraction", []opts.LineData{})
+	}
 
 	return &GCCPUFractionViewer{graph: graph, p: p, numCPU: numCPU}
 }
@@ -58,13 +64,24 @@ func (vr *GCCPUFractionViewer) View() *charts.Line {
 func (vr *GCCPUFractionViewer) Serve(w http.ResponseWriter, _ *http.Request) {
 	vr.smgr.Tick()
 
-	metrics := Metrics{
-		Values: []float64{
-			FixedPrecision(memstats.Stats.GCCPUFraction, 6),
-			FixedPrecision(vr.getAppCPUFraction(), 6),
-			FixedPrecision(vr.getAppCPUFraction()/float64(vr.numCPU), 6),
-		},
-		Time: memstats.T,
+	var metrics Metrics
+	if vr.numCPU > 0 {
+		metrics = Metrics{
+			Values: []float64{
+				FixedPrecision(memstats.Stats.GCCPUFraction, 6),
+				FixedPrecision(vr.getAppCPUFraction(), 6),
+				FixedPrecision(vr.getAppCPUFraction()/float64(vr.numCPU), 6),
+			},
+			Time: memstats.T,
+		}
+	} else {
+		metrics = Metrics{
+			Values: []float64{
+				FixedPrecision(memstats.Stats.GCCPUFraction, 6),
+				FixedPrecision(vr.getAppCPUFraction(), 6),
+			},
+			Time: memstats.T,
+		}
 	}
 
 	bs, _ := json.Marshal(metrics)
