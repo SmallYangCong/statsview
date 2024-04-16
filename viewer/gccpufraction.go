@@ -1,12 +1,15 @@
 package viewer
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
+	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
@@ -39,6 +42,7 @@ func NewGCCPUFractionViewerWithNumCPU() Viewer {
 		charts.WithYAxisOpts(opts.YAxis{Name: "Percent", AxisLabel: &opts.AxisLabel{Show: true, Formatter: "{value} %", Rotate: 35}}),
 	)
 	graph.AddSeries("GC CPUFraction", []opts.LineData{})
+	graph.AddSeries("Server CPUFraction", []opts.LineData{})
 	graph.AddSeries("App CPUFraction", []opts.LineData{})
 
 	return &GCCPUFractionViewer{graph: graph, p: p}
@@ -62,6 +66,7 @@ func (vr *GCCPUFractionViewer) Serve(w http.ResponseWriter, _ *http.Request) {
 	metrics := Metrics{
 		Values: []float64{
 			FixedPrecision(memstats.Stats.GCCPUFraction, 6),
+			FixedPrecision(vr.getServerCPUFraction(), 6),
 			FixedPrecision(vr.getAppCPUFraction(), 6),
 		},
 		Time: memstats.T,
@@ -78,4 +83,13 @@ func (vr *GCCPUFractionViewer) getAppCPUFraction() float64 {
 	}
 	percent, _ := p.Percent(0)
 	return percent / 100
+}
+
+func (vr *GCCPUFractionViewer) getServerCPUFraction() float64 {
+	totalUsage, _ := cpu.PercentWithContext(context.Background(), time.Second, false)
+	if len(totalUsage) == 0 {
+		return 0.0
+	}
+
+	return totalUsage[0] / 100
 }
