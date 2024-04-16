@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
@@ -18,21 +17,20 @@ const (
 
 // GCCPUFractionViewer collects the GC-CPU fraction metric via `runtime.ReadMemStats()`
 type GCCPUFractionViewer struct {
-	smgr   *StatsMgr
-	graph  *charts.Line
-	p      *process.Process
-	numCPU int
+	smgr  *StatsMgr
+	graph *charts.Line
+	p     *process.Process
 }
 
 // NewGCCPUFractionViewer returns the GCCPUFractionViewer instance
 // Series: Fraction
 func NewGCCPUFractionViewer() Viewer {
-	return NewGCCPUFractionViewerWithNumCPU(-1)
+	return NewGCCPUFractionViewerWithNumCPU()
 }
 
 // NewGCCPUFractionViewer returns the GCCPUFractionViewer instance
 // Series: Fraction
-func NewGCCPUFractionViewerWithNumCPU(numCPU int) Viewer {
+func NewGCCPUFractionViewerWithNumCPU() Viewer {
 	p, _ := process.NewProcess(int32(os.Getpid()))
 
 	graph := NewBasicView(VGCCPUFraction)
@@ -42,11 +40,8 @@ func NewGCCPUFractionViewerWithNumCPU(numCPU int) Viewer {
 	)
 	graph.AddSeries("GC CPUFraction", []opts.LineData{})
 	graph.AddSeries("App CPUFraction", []opts.LineData{})
-	if numCPU > 0 {
-		graph.AddSeries("App OneCPUFraction", []opts.LineData{})
-	}
 
-	return &GCCPUFractionViewer{graph: graph, p: p, numCPU: numCPU}
+	return &GCCPUFractionViewer{graph: graph, p: p}
 }
 
 func (vr *GCCPUFractionViewer) SetStatsMgr(smgr *StatsMgr) {
@@ -64,24 +59,12 @@ func (vr *GCCPUFractionViewer) View() *charts.Line {
 func (vr *GCCPUFractionViewer) Serve(w http.ResponseWriter, _ *http.Request) {
 	vr.smgr.Tick()
 
-	var metrics Metrics
-	if vr.numCPU > 0 {
-		metrics = Metrics{
-			Values: []float64{
-				FixedPrecision(memstats.Stats.GCCPUFraction, 6),
-				FixedPrecision(vr.getAppCPUFraction(), 6),
-				FixedPrecision(vr.getAppCPUFraction()/float64(vr.numCPU), 6),
-			},
-			Time: memstats.T,
-		}
-	} else {
-		metrics = Metrics{
-			Values: []float64{
-				FixedPrecision(memstats.Stats.GCCPUFraction, 6),
-				FixedPrecision(vr.getAppCPUFraction(), 6),
-			},
-			Time: memstats.T,
-		}
+	metrics := Metrics{
+		Values: []float64{
+			FixedPrecision(memstats.Stats.GCCPUFraction, 6),
+			FixedPrecision(vr.getAppCPUFraction(), 6),
+		},
+		Time: memstats.T,
 	}
 
 	bs, _ := json.Marshal(metrics)
@@ -93,6 +76,6 @@ func (vr *GCCPUFractionViewer) getAppCPUFraction() float64 {
 	if p == nil {
 		return 0.0
 	}
-	percent, _ := p.Percent(time.Second)
+	percent, _ := p.Percent(0)
 	return percent / 100
 }
