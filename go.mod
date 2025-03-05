@@ -1,4 +1,4 @@
-module github.com/smallnest/statsview
+module github.com/SmallYangCong/statsview
 
 go 1.20
 
