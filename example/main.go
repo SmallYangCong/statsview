@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/smallnest/statsview"
+	"github.com/SmallYangCong/statsview"
 )
 
 func main() {
